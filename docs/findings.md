@@ -9,6 +9,7 @@
 3. 可行方案是通过 `sfroot -> Stateflow.EMChart` 注入脚本内容。
 4. `run_all_tests.m` 使用相对路径会受执行上下文影响，需基于 `mfilename('fullpath')` 计算项目根路径。
 5. `run_all_cases.m` 中 cell 拼接需使用纵向拼接（`;`），否则可能触发维度不一致。
+6. 私有仓库 `main` 分支保护在当前账号策略下不可启用，`gh api` 返回 `HTTP 403`（需 GitHub Pro 或公开仓库）。
 
 ## 关键决策
 
@@ -24,6 +25,7 @@
    - 交付清理 `project-handoff-closedloop`
    - GitHub 协作 `github-project-manager`
 5. GitHub 操作按 preflight 先行，远程写操作在本地验证通过后执行。
+6. 分支保护门禁采用“双轨策略”：仓库层规则受限时，先用流程门禁（PR 必审+证据清单）兜底，后续再升级账号策略。
 
 ## 待跟进
 

@@ -41,8 +41,8 @@
 - 新增索引与使用文档：`README.md`、`scripts/README.md`、`tests/README.md`。
 - 本文件与 `docs/findings.md` 已压缩为关键结论版。
 
-## 4) 当前状态
+## 4) GitHub 纳管与当前状态
 
-- 状态：`执行中（模型/脚本/测试链路已恢复）`
-- 阻塞：无硬阻塞。
-- 下一步：完成 GitHub 仓库初始化、首次提交与远端推送，随后进入分支保护与 Issue/PR 门禁配置。
+- 已完成：`git init`、首提 `200313b`、私有仓库创建、`main` 推送（`origin/main`）。
+- 分支保护：调用 GitHub API 返回 `HTTP 403`（私有仓库需 GitHub Pro 或改公开仓库）。
+- 状态：`执行中（实现+验证+远端纳管已完成，分支保护待账号策略决策）`。
