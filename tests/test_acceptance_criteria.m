@@ -39,6 +39,23 @@ function test_acceptance_criteria()
     assert(max(abs(fault_pos.V_pos_gnd(idx_fault_pos))) < 50, 'O5 failed: pos-ground voltage not near 0V');
     assert(abs(mean(fault_pos.V_neg_gnd(idx_fault_pos)) + vdc_ref) < 80, ...
         'O5 failed: pos-ground fault should lift negative pole near -1500V');
+
+    % M5.3 threshold rationale:
+    % 1) ratio >= 1.20: no-inductor case must be at least 20% steeper than with-inductor.
+    % 2) delta >= 1e4 A/s: avoid tiny numerical differences being misclassified as physical effect.
+    didt_ratio_threshold = 1.20;
+    didt_delta_threshold = 1e4;
+    with_inductor = run_case_simulation(1, 1, 1.0, 1, struct('with_inductor', true));
+    without_inductor = run_case_simulation(1, 1, 1.0, 1, struct('with_inductor', false));
+    didt_with = compute_fault_didt(with_inductor.t, with_inductor.I_fault_total, 0.6, 0.65);
+    didt_without = compute_fault_didt(without_inductor.t, without_inductor.I_fault_total, 0.6, 0.65);
+    assert(didt_without > didt_with, ...
+        sprintf('M5.3 failed: dI/dt without inductor %.3f <= with inductor %.3f', didt_without, didt_with));
+    assert(didt_without >= didt_with * didt_ratio_threshold, ...
+        sprintf('M5.3 failed: ratio %.3f < %.3f', didt_without / didt_with, didt_ratio_threshold));
+    assert((didt_without - didt_with) >= didt_delta_threshold, ...
+        sprintf('M5.3 failed: delta %.3f A/s < %.3f A/s', ...
+        didt_without - didt_with, didt_delta_threshold));
 end
 
 function t_recover = compute_recovery_time(t, vdc, vref, tol, t_step)
@@ -54,4 +71,18 @@ function t_recover = compute_recovery_time(t, vdc, vref, tol, t_step)
             return;
         end
     end
+end
+
+function didt_peak = compute_fault_didt(t, current, t_start, t_end)
+    idx = t >= t_start & t <= t_end;
+    t_window = t(idx);
+    i_window = current(idx);
+    if numel(t_window) < 3
+        error('M5.3 failed: insufficient samples in fault window for dI/dt.');
+    end
+
+    dt = diff(t_window);
+    di = diff(i_window);
+    didt = di ./ dt;
+    didt_peak = max(didt);
 end

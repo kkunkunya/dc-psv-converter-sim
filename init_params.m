@@ -19,10 +19,17 @@ function params = init_params()
 
     params.fault_trigger_time = 0.6;
     params.fault_duration = 0.05;
+    params.l_rect_tau_with = 0.005;
+    params.l_bus_tau_with = 0.0025;
+    params.l_rect_tau_without = 0.02;
+    params.l_bus_tau_without = 0.01;
 
     assignin('base', 'sim_params', params);
     assignin('base', 'Vdc_nominal', params.Vdc_nominal);
     assignin('base', 'Ts', params.sample_time);
+    assignin('base', 'with_inductor_sim', 1);
+    assignin('base', 'Lrect_tau_sim', params.l_rect_tau_with);
+    assignin('base', 'Lbus_tau_sim', params.l_bus_tau_with);
 
     % Default startup state if user did not set case variables.
     if evalin('base', 'exist(''mode_id_sim'', ''var'')') == 0
