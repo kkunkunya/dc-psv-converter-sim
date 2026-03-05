@@ -4,7 +4,7 @@
 <!-- Output: MATLAB/Simulink 仿真模型 (.slx) + 参数初始化脚本 + 使用说明 -->
 <!-- Pos: 本地交付项目，单一开发者，MATLAB 2020b 环境 -->
 
-**文档版本**: 2.1（论文图不可获取，改用行业标准拓扑补全）
+**文档版本**: 2.4（O3证据链闭环，验收映射更新）
 **更新日期**: 2026-03-05
 **项目名称**: 直流PSV变流器系统 MATLAB/Simulink 仿真
 **目标平台**: MATLAB/Simulink 2020b + Simscape Electrical
@@ -348,7 +348,7 @@ disp(['0.2s 时母线电压: ', num2str(V_bus(round(0.2/Ts))), ' V']);
 
 ---
 
-**文档状态**: v2.3 执行中（链路分层重建已完成，进入高保真深化阶段）。
+**文档状态**: v2.4 开发完成（O1~O6 已形成自动化证据链，进入交付完善阶段）。
 
 ---
 
@@ -373,3 +373,18 @@ disp(['0.2s 时母线电压: ', num2str(V_bus(round(0.2/Ts))), ' V']);
 3. 分支策略：`main` 保护（至少 1 review；若账户策略限制则记录阻塞并给替代门禁）。
 4. 协作规则：`1 issue = 1 branch = 1 PR`，PR 必附验证证据（命令、输出、图）。
 5. 合并门禁：Review 结论仅 `pass/rework/blocked`，未 `pass` 禁止合并。
+
+---
+
+## 十四、最终验收结论（O1~O6 证据映射）
+
+| 期望 | 结论 | 自动验收证据 | 数据证据 | 命令证据（2026-03-05） | 剩余项/风险项 |
+|------|------|-------------|---------|-------------------------|--------------|
+| O1 直流母线稳压 | 通过 | `tests/test_acceptance_criteria.m`（mode1~4 稳态窗 `t>=0.8s`，`Vdc` 偏差门限 ±1%） | `data/summary_results.csv`：`vdc_mean/vdc_min/vdc_max` | `run_all_tests` 输出 `ALL_TESTS_PASSED` | 需在客户 MATLAB 2020b 现场复验同命令 |
+| O2 电流稳定 | 通过 | `tests/test_acceptance_criteria.m`（稳态纹波门限） | `data/mode1~4_*.csv`：`idc_a/i_gen_a/i_load_a` | `run_all_tests` 输出 `ALL_TESTS_PASSED` | 2020b 环境尚未实机复验 |
+| O3 中点接地正确 | 通过（本轮补强） | `tests/test_acceptance_criteria.m`：`|V_pos_gnd+V_neg_gnd|`、`V_pos_gnd≈+Vdc/2`、`V_neg_gnd≈-Vdc/2`，并校验汇总列存在 | `data/summary_results.csv`：`midpoint_abs_max_v`、`vpos_halfbus_err_max_v`、`vneg_halfbus_err_max_v`（mode1~4） | `run_all_tests` 输出 `ALL_TESTS_PASSED`，`run_all_cases` 刷新汇总成功 | 2020b 环境尚未实机复验 |
+| O4 四工况切换恢复 | 通过 | `tests/test_acceptance_criteria.m`（`WC2->WC4` 恢复时间 `<=0.3s`） | `data/modes_overlay.png`、`data/mode*_*.csv` | `run_all_tests` 输出 `ALL_TESTS_PASSED` | 2020b 环境尚未实机复验 |
+| O5 故障波形可观测 | 通过 | `tests/test_acceptance_criteria.m`（母线短路压降、正极接地电压约束） | `data/fault_*.csv` + `data/faults_overlay.png` | `run_all_tests` 输出 `ALL_TESTS_PASSED` | 2020b 环境尚未实机复验 |
+| O6 限流保护元件就位 | 通过 | `tests/test_acceptance_criteria.m`（M5.3：有/无电感 `dI/dt` 差异断言） | `data/summary_results.csv`：`fault_didt_max_a_per_s`、`fault_peak_current_a` | `run_all_tests` 输出 `ALL_TESTS_PASSED`，`run_all_cases` 刷新对比产物 | 2020b 环境尚未实机复验 |
+
+**总体验收结论**：在当前 MATLAB R2025a 环境下，O1~O6 均有可复现自动化证据，判定“开发完成并进入交付完善阶段”；唯一未闭环项是客户目标环境 MATLAB 2020b 的现场复验。

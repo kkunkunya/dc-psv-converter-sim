@@ -6,11 +6,18 @@ function test_acceptance_criteria()
     vdc_ref = 1500;
     vdc_tol = 0.01 * vdc_ref;
     settle_t0 = 0.8;
+    % O3阈值工程依据：
+    % 1) midpoint_abs_tol=20V（约母线1500V的1.3%），给求解器离散误差和数值噪声留余量。
+    % 2) halfbus_err_tol=10V（约半母线750V的1.3%），可约束中点分压对称且不过度苛刻。
+    midpoint_abs_tol = 20;
+    halfbus_err_tol = 10;
 
     for mode_id = 1:4
         out_mode = run_case_simulation(mode_id, 0, 1.0);
         idx_settle = out_mode.t >= settle_t0;
         vdc_settle = out_mode.Vdc(idx_settle);
+        v_pos_settle = out_mode.V_pos_gnd(idx_settle);
+        v_neg_settle = out_mode.V_neg_gnd(idx_settle);
 
         assert(~isempty(vdc_settle), sprintf('mode%d missing steady-state window', mode_id));
 
@@ -23,6 +30,19 @@ function test_acceptance_criteria()
         assert(ripple_pp <= 2 * vdc_tol, ...
             sprintf('O2 failed mode%d: steady-state ripple %.3fV exceeds %.3fV', ...
             mode_id, ripple_pp, 2 * vdc_tol));
+
+        midpoint_abs_max = max(abs(v_pos_settle + v_neg_settle));
+        vpos_halfbus_err_max = max(abs(v_pos_settle - 0.5 * vdc_settle));
+        vneg_halfbus_err_max = max(abs(v_neg_settle + 0.5 * vdc_settle));
+        assert(midpoint_abs_max <= midpoint_abs_tol, ...
+            sprintf('O3 failed mode%d: |Vpos+Vneg| max %.3fV exceeds %.3fV', ...
+            mode_id, midpoint_abs_max, midpoint_abs_tol));
+        assert(vpos_halfbus_err_max <= halfbus_err_tol, ...
+            sprintf('O3 failed mode%d: Vpos-halfbus error max %.3fV exceeds %.3fV', ...
+            mode_id, vpos_halfbus_err_max, halfbus_err_tol));
+        assert(vneg_halfbus_err_max <= halfbus_err_tol, ...
+            sprintf('O3 failed mode%d: Vneg-halfbus error max %.3fV exceeds %.3fV', ...
+            mode_id, vneg_halfbus_err_max, halfbus_err_tol));
     end
 
     out_transition = run_case_simulation(4, 0, 1.0, 2);
@@ -56,6 +76,8 @@ function test_acceptance_criteria()
     assert((didt_without - didt_with) >= didt_delta_threshold, ...
         sprintf('M5.3 failed: delta %.3f A/s < %.3f A/s', ...
         didt_without - didt_with, didt_delta_threshold));
+
+    validate_o3_summary_columns(midpoint_abs_tol, halfbus_err_tol);
 end
 
 function t_recover = compute_recovery_time(t, vdc, vref, tol, t_step)
@@ -85,4 +107,38 @@ function didt_peak = compute_fault_didt(t, current, t_start, t_end)
     di = diff(i_window);
     didt = di ./ dt;
     didt_peak = max(didt);
+end
+
+function validate_o3_summary_columns(midpoint_abs_tol, halfbus_err_tol)
+    this_file = mfilename('fullpath');
+    root_dir = fileparts(fileparts(this_file));
+    summary_path = fullfile(root_dir, 'data', 'summary_results.csv');
+    assert(isfile(summary_path), 'O3 failed: summary_results.csv not found.');
+
+    summary_tbl = readtable(summary_path, 'VariableNamingRule', 'preserve');
+    required_cols = {'midpoint_abs_max_v', 'vpos_halfbus_err_max_v', 'vneg_halfbus_err_max_v'};
+    for k = 1:numel(required_cols)
+        assert(ismember(required_cols{k}, summary_tbl.Properties.VariableNames), ...
+            sprintf('O3 failed: summary missing column %s', required_cols{k}));
+    end
+
+    mode_cases = {'mode1_cruise_low', 'mode2_cruise_high', 'mode3_dp_normal', 'mode4_dp_harsh'};
+    for k = 1:numel(mode_cases)
+        row_idx = strcmp(summary_tbl.('case'), mode_cases{k});
+        assert(any(row_idx), sprintf('O3 failed: summary missing case %s', mode_cases{k}));
+        row = find(row_idx, 1, 'first');
+
+        midpoint_val = summary_tbl.midpoint_abs_max_v(row);
+        vpos_err_val = summary_tbl.vpos_halfbus_err_max_v(row);
+        vneg_err_val = summary_tbl.vneg_halfbus_err_max_v(row);
+        assert(isfinite(midpoint_val) && midpoint_val <= midpoint_abs_tol, ...
+            sprintf('O3 failed %s: midpoint_abs_max_v %.3fV exceeds %.3fV', ...
+            mode_cases{k}, midpoint_val, midpoint_abs_tol));
+        assert(isfinite(vpos_err_val) && vpos_err_val <= halfbus_err_tol, ...
+            sprintf('O3 failed %s: vpos_halfbus_err_max_v %.3fV exceeds %.3fV', ...
+            mode_cases{k}, vpos_err_val, halfbus_err_tol));
+        assert(isfinite(vneg_err_val) && vneg_err_val <= halfbus_err_tol, ...
+            sprintf('O3 failed %s: vneg_halfbus_err_max_v %.3fV exceeds %.3fV', ...
+            mode_cases{k}, vneg_err_val, halfbus_err_tol));
+    end
 end

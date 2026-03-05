@@ -37,6 +37,9 @@ function run_all_cases()
     summary_std = zeros(numel(all_cases), 1);
     summary_min = zeros(numel(all_cases), 1);
     summary_max = zeros(numel(all_cases), 1);
+    summary_midpoint_abs_max = nan(numel(all_cases), 1);
+    summary_vpos_halfbus_err_max = nan(numel(all_cases), 1);
+    summary_vneg_halfbus_err_max = nan(numel(all_cases), 1);
     summary_fault_peak = nan(numel(all_cases), 1);
     summary_didt_peak = nan(numel(all_cases), 1);
 
@@ -55,6 +58,13 @@ function run_all_cases()
         summary_std(i) = std(out.Vdc);
         summary_min(i) = min(out.Vdc);
         summary_max(i) = max(out.Vdc);
+        if c.fault == 0
+            [midpoint_abs_max, vpos_halfbus_err_max, vneg_halfbus_err_max] = ...
+                compute_o3_metrics(out.t, out.Vdc, out.V_pos_gnd, out.V_neg_gnd, 0.8);
+            summary_midpoint_abs_max(i) = midpoint_abs_max;
+            summary_vpos_halfbus_err_max(i) = vpos_halfbus_err_max;
+            summary_vneg_halfbus_err_max(i) = vneg_halfbus_err_max;
+        end
         if c.fault == 1
             [didt_peak, ifault_peak] = compute_fault_metrics(out.t, out.I_fault_total, ...
                 params.fault_trigger_time, params.fault_trigger_time + params.fault_duration);
@@ -64,9 +74,11 @@ function run_all_cases()
     end
 
     summary_tbl = table(summary_case, summary_with_inductor, summary_mean, summary_std, ...
-        summary_min, summary_max, summary_fault_peak, summary_didt_peak, ...
+        summary_min, summary_max, summary_midpoint_abs_max, summary_vpos_halfbus_err_max, ...
+        summary_vneg_halfbus_err_max, summary_fault_peak, summary_didt_peak, ...
         'VariableNames', {'case', 'with_inductor', 'vdc_mean', 'vdc_std', ...
-        'vdc_min', 'vdc_max', 'fault_peak_current_a', 'fault_didt_max_a_per_s'});
+        'vdc_min', 'vdc_max', 'midpoint_abs_max_v', 'vpos_halfbus_err_max_v', ...
+        'vneg_halfbus_err_max_v', 'fault_peak_current_a', 'fault_didt_max_a_per_s'});
     writetable(summary_tbl, fullfile(data_dir, 'summary_results.csv'));
 end
 
@@ -83,4 +95,22 @@ function [didt_peak, i_peak] = compute_fault_metrics(t, current, t_start, t_end)
     didt = diff(i_window) ./ diff(t_window);
     didt_peak = max(didt);
     i_peak = max(i_window);
+end
+
+function [midpoint_abs_max, vpos_halfbus_err_max, vneg_halfbus_err_max] = ...
+    compute_o3_metrics(t, vdc, v_pos_gnd, v_neg_gnd, settle_t0)
+    idx = t >= settle_t0;
+    if ~any(idx)
+        midpoint_abs_max = nan;
+        vpos_halfbus_err_max = nan;
+        vneg_halfbus_err_max = nan;
+        return;
+    end
+
+    vdc_settle = vdc(idx);
+    v_pos_settle = v_pos_gnd(idx);
+    v_neg_settle = v_neg_gnd(idx);
+    midpoint_abs_max = max(abs(v_pos_settle + v_neg_settle));
+    vpos_halfbus_err_max = max(abs(v_pos_settle - 0.5 * vdc_settle));
+    vneg_halfbus_err_max = max(abs(v_neg_settle + 0.5 * vdc_settle));
 end
