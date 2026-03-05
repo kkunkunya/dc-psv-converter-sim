@@ -20,8 +20,15 @@ function out = run_case_simulation(mode_id, fault_id, stop_time)
     assignin('base', 'fault_id_sim', fault_id);
 
     model_path = fullfile(root_dir, 'models', 'dc_psv_system.slx');
+    builder_path = fullfile(root_dir, 'scripts', 'build_dc_psv_system.m');
     if ~isfile(model_path)
         build_dc_psv_system();
+    else
+        model_info = dir(model_path);
+        builder_info = dir(builder_path);
+        if ~isempty(builder_info) && model_info.datenum < builder_info.datenum
+            build_dc_psv_system();
+        end
     end
 
     load_system(model_path);

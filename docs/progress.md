@@ -3,46 +3,48 @@
 **项目**: 直流平台供应船变流器系统建模与仿真
 **更新时间**: 2026-03-05
 
-## 1) 历史关键结果（保留结论）
+## 1) 当前阶段结论
 
-- 已完成需求收敛：四工况、三故障、中点接地、1s仿真、MATLAB 2020b 交付目标。
-- 历史调试中曾出现母线极性/电压异常，后通过电源模型与参数校准恢复稳压。
-- 交付基线曾被清扫为 `docs + data`，实现脚本与模型需重建。
+- 阶段：`重建执行中（已完成结构重建 + 指标回归）`
+- 结果：模型已从“单 MATLAB Function 简化体”重建为“分层子系统链路模型”。
+- 状态：全量自动化测试通过，数据产物已刷新。
 
-## 2) 本轮执行（2026-03-05）
+## 2) 本轮关键执行证据
 
-### S0 GitHub 前置检查
-- `gh auth status`：账号 `kkunkunya` 已登录。
-- `git rev-parse --is-inside-work-tree`：初始为 `not_git_repo`。
-- `git remote -v`：初始为 `no_remote`。
+### A. TDD（RED → GREEN）
+- RED：新增 `tests/test_model_structure.m` 后首次运行失败（缺少 `Control_Subsystem` 等分层结构）。
+- GREEN：重写 `scripts/build_dc_psv_system.m` 后结构测试通过。
 
-### S2-S6 TDD 重建与验证
-- RED 证据：首次执行 `tests/run_all_tests.m` 失败（`set_operating_mode` 未定义）。
-- GREEN 实现：新增并接通以下实现：
-  - `init_params.m`
-  - `utils/set_operating_mode.m`
-  - `utils/set_fault_mode.m`
-  - `scripts/build_dc_psv_system.m`
-  - `scripts/run_case_simulation.m`
-  - `scripts/export_case_results.m`
-  - `scripts/run_all_cases.m`
-- 验证命令：
+### B. 模型结构重建
+- 顶层已包含：`Control_Subsystem`、`Generation_Subsystem`、`DC_Bus_Subsystem`、`Load_Subsystem`、`Fault_Subsystem`、`GroundMonitor_Subsystem`。
+- 分层规模：
+  - `Generation_Subsystem_BLOCKS=51`
+  - `Load_Subsystem_BLOCKS=139`
+  - `Fault_Subsystem_BLOCKS=19`
+  - `DC_Bus_Subsystem_BLOCKS=14`
+  - `GroundMonitor_Subsystem_BLOCKS=13`
+  - `Control_Subsystem_BLOCKS=6`
+- 反取巧门禁：`MATLAB_FUNCTION_BLOCKS=0`。
+
+### C. 验证命令与结果
+- 全量测试：
   - `/Applications/MATLAB_R2025a.app/bin/matlab -nodesktop -nosplash -batch "run('tests/run_all_tests.m'); run_all_tests;"`
-- 验证结果：`ALL_TESTS_PASSED`（两轮复验均通过）。
+  - 输出：`ALL_TESTS_PASSED`
+- 关键指标：
+  - `VDC_02_MEAN=1505.700`
+  - `VDC_02_MIN=1505.083`
+  - `VDC_02_MAX=1506.347`
+  - `FAULT_BUS_MIN=837.372`
 
-### 数据产物更新
-- 批量仿真命令：
-  - `/Applications/MATLAB_R2025a.app/bin/matlab -nodesktop -nosplash -batch "addpath('scripts'); run_all_cases;"`
-- 产物已刷新：`data/mode*.csv/png`、`data/fault*.csv/png`、`data/summary_results.csv`（时间戳 2026-03-05 11:49）。
+### D. 数据产物刷新
+- 已更新：`data/mode*.csv/png`、`data/fault*.csv/png`、`data/summary_results.csv`。
 
-## 3) 文档与规范动作
+## 3) GitHub 状态
 
-- `docs/project-spec.md` 更新到 v2.2，新增“Skill 调用与 GitHub 执行计划”。
-- 新增索引与使用文档：`README.md`、`scripts/README.md`、`tests/README.md`。
-- 本文件与 `docs/findings.md` 已压缩为关键结论版。
+- 已纳管并推送：`kkunkunya/dc-psv-converter-sim`（private）。
+- 进展：提交已包含重建代码与证据更新。
+- 备注：私有仓库分支保护仍受账号策略限制（403）。
 
-## 4) GitHub 纳管与当前状态
+## 4) 下一步
 
-- 已完成：`git init`、首提 `200313b`、私有仓库创建、`main` 推送（`origin/main`）。
-- 分支保护：调用 GitHub API 返回 `HTTP 403`（私有仓库需 GitHub Pro 或改公开仓库）。
-- 状态：`执行中（实现+验证+远端纳管已完成，分支保护待账号策略决策）`。
+- 继续按 M3/M4 做高保真扩展（电机与控制环细化、参数辨识、2020b 兼容复验）。

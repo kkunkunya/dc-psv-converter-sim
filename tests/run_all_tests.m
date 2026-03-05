@@ -12,6 +12,7 @@ function run_all_tests()
     addpath(fullfile(root_dir, 'scripts'));
 
     tests = {
+        @test_model_structure,
         @test_set_operating_mode,
         @test_set_fault_mode,
         @test_build_and_run_case,

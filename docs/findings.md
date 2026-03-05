@@ -4,30 +4,21 @@
 
 ## 关键发现
 
-1. 当前工作区在重建前仅保留 `docs/` 与 `data/`，实现资产（模型/脚本）已缺失。
-2. `MATLAB Function` 块不能用 `set_param(...,'Script',...)` 直接写脚本，会报“SubSystem block does not have a parameter named Script”。
-3. 可行方案是通过 `sfroot -> Stateflow.EMChart` 注入脚本内容。
-4. `run_all_tests.m` 使用相对路径会受执行上下文影响，需基于 `mfilename('fullpath')` 计算项目根路径。
-5. `run_all_cases.m` 中 cell 拼接需使用纵向拼接（`;`），否则可能触发维度不一致。
-6. 私有仓库 `main` 分支保护在当前账号策略下不可启用，`gh api` 返回 `HTTP 403`（需 GitHub Pro 或公开仓库）。
+1. 旧模型确实是“单子系统 + MATLAB Function”简化实现，不满足链路搭建要求。
+2. 结构门禁测试必须显式检查：顶层分层、DG 支路数、负载支路数、`MATLAB Function=0`。
+3. `Compare To Constant` 直接参与电流加权会触发数据类型传播冲突，需加 `Data Type Conversion` 到 `double`。
+4. MATLAB 并发写同一 `.slx` 会触发 `save_system` 重命名失败（`.bak` 路径问题），验证阶段必须串行执行。
+5. `run_case_simulation` 若不判断模型与构建脚本时间戳，容易“改了脚本却跑旧模型”。
 
 ## 关键决策
 
-1. 采用最小可运行重建路径：先恢复测试与基础脚本，再恢复模型与批量导出。
-2. 执行方式固定为 TDD：先制造失败测试（RED），再最小实现（GREEN），再复验。
-3. 模型实现采用“行为级 DC 母线动态模型”保证可运行与可验证，保留后续升级为更高保真 Simscape 网络的空间。
-4. Skill 绑定策略落地到 `project-spec`：
-   - 规划 `req-project-dev-draft`
-   - 建模 `simulink-model-builder`
-   - 实现 `test-driven-development`
-   - 调试 `systematic-debugging`
-   - 完成前 `verification-before-completion`
-   - 交付清理 `project-handoff-closedloop`
-   - GitHub 协作 `github-project-manager`
-5. GitHub 操作按 preflight 先行，远程写操作在本地验证通过后执行。
-6. 分支保护门禁采用“双轨策略”：仓库层规则受限时，先用流程门禁（PR 必审+证据清单）兜底，后续再升级账号策略。
+1. 保留 TDD 路径：先加失败的结构测试，再重写构建脚本并调参通过。
+2. 模型重建采用纯块图分层，不在主链路使用 `MATLAB Function`。
+3. 新模型分层固定为：控制、发电、母线、负载、故障、接地监测。
+4. 在母线子系统加入参考校正环与阻尼，保证稳压指标与故障跌落指标同时达标。
+5. 批量仿真/测试执行改为串行，避免并发文件写冲突。
 
 ## 待跟进
 
-1. 在客户 MATLAB 2020b 环境复跑并确认兼容性（P0 Gate）。
-2. 若需更高保真故障电流斜率，下一阶段将模型从行为级升级为 Simscape 物理网络并补充参数辨识。
+1. 按客户 P0 环境（MATLAB 2020b）执行兼容复验并回传证据。
+2. 当前仍是工程化简化链路，后续需继续向更高保真 Simscape 物理网络推进（M3/M4 深化阶段）。
