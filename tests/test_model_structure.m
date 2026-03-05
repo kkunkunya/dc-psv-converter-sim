@@ -54,5 +54,15 @@ function test_model_structure()
     all_blocks = find_system('dc_psv_system', 'Type', 'Block');
     assert(numel(all_blocks) - 1 >= 80, 'rebuild model is too small and likely incomplete');
 
+    line_handles = find_system('dc_psv_system', 'FindAll', 'on', 'Type', 'line');
+    for i = 1:numel(line_handles)
+        src_port = get_param(line_handles(i), 'SrcPortHandle');
+        dst_port = get_param(line_handles(i), 'DstPortHandle');
+        has_dangling_src = isempty(src_port) || any(src_port == -1);
+        has_dangling_dst = isempty(dst_port) || any(dst_port == -1);
+        assert(~(has_dangling_src || has_dangling_dst), ...
+            sprintf('dangling line detected (handle=%d)', line_handles(i)));
+    end
+
     close_system('dc_psv_system', 0);
 end

@@ -1,50 +1,45 @@
 # 项目进度记录（压缩版）
 
-**项目**: 直流平台供应船变流器系统建模与仿真
+**项目**: 直流平台供应船变流器系统建模与仿真  
 **更新时间**: 2026-03-05
 
 ## 1) 当前阶段结论
 
-- 阶段：`重建执行中（已完成结构重建 + 指标回归）`
-- 结果：模型已从“单 MATLAB Function 简化体”重建为“分层子系统链路模型”。
-- 状态：全量自动化测试通过，数据产物已刷新。
+- 阶段：`分层模型验收强化（本轮完成）`
+- 结果：保留了用户手工删线基线，完成四工况稳态 + WC2→WC4 过渡 + 故障验收增强。
+- 状态：强制验证命令全部通过，数据产物已刷新。
 
-## 2) 本轮关键执行证据
+## 2) 本轮关键证据
 
-### A. TDD（RED → GREEN）
-- RED：新增 `tests/test_model_structure.m` 后首次运行失败（缺少 `Control_Subsystem` 等分层结构）。
-- GREEN：重写 `scripts/build_dc_psv_system.m` 后结构测试通过。
+### A. 基线锁定
+- 初始检查：`git status --short` 仅有 `M models/dc_psv_system.slx`。
+- 基线提交：`b56f9ea chore: preserve manual line cleanup baseline`。
 
-### B. 模型结构重建
-- 顶层已包含：`Control_Subsystem`、`Generation_Subsystem`、`DC_Bus_Subsystem`、`Load_Subsystem`、`Fault_Subsystem`、`GroundMonitor_Subsystem`。
-- 分层规模：
-  - `Generation_Subsystem_BLOCKS=51`
-  - `Load_Subsystem_BLOCKS=139`
-  - `Fault_Subsystem_BLOCKS=19`
-  - `DC_Bus_Subsystem_BLOCKS=14`
-  - `GroundMonitor_Subsystem_BLOCKS=13`
-  - `Control_Subsystem_BLOCKS=6`
-- 反取巧门禁：`MATLAB_FUNCTION_BLOCKS=0`。
+### B. TDD（RED → GREEN）
+- RED 命令：`/Applications/MATLAB_R2025a.app/bin/matlab -nodesktop -nosplash -batch "run('tests/run_all_tests.m'); run_all_tests;"`
+- RED 输出：`Error using assert ... dangling line detected ...`（`test_model_structure`）。
+- GREEN 同命令输出：`ALL_TESTS_PASSED`。
 
-### C. 验证命令与结果
-- 全量测试：
-  - `/Applications/MATLAB_R2025a.app/bin/matlab -nodesktop -nosplash -batch "run('tests/run_all_tests.m'); run_all_tests;"`
-  - 输出：`ALL_TESTS_PASSED`
-- 关键指标：
-  - `VDC_02_MEAN=1505.700`
-  - `VDC_02_MIN=1505.083`
-  - `VDC_02_MAX=1506.347`
-  - `FAULT_BUS_MIN=837.372`
+### C. 强制仿真刷新
+- 执行：`/Applications/MATLAB_R2025a.app/bin/matlab -nodesktop -nosplash -batch "addpath('scripts'); run_all_cases;"`
+- 结果：`data/mode*.csv/png`、`data/fault*.csv/png`、`data/summary_results.csv` 全部更新。
 
-### D. 数据产物刷新
-- 已更新：`data/mode*.csv/png`、`data/fault*.csv/png`、`data/summary_results.csv`。
+### D. 关键指标（复现实测）
+- `MODE1_STEADY mean=1505.247 std=0.155 min=1504.983 max=1505.520`
+- `MODE2_STEADY mean=1497.972 std=0.070 min=1497.850 max=1498.092`
+- `MODE3_STEADY mean=1498.153 std=0.065 min=1498.037 max=1498.263`
+- `MODE4_STEADY mean=1497.890 std=0.073 min=1497.762 max=1498.015`
+- `TRANSIENT_WC2_TO_WC4_RECOVERY_S=0.0000`
+- `FAULT_BUS_SHORT_MIN_VDC=731.464`
+- `FAULT_POS_GROUND_VPOS_ABS_MAX=0.000`
+- `FAULT_POS_GROUND_VNEG_MEAN=-1506.039`
 
-## 3) GitHub 状态
+## 3) 本轮改动范围
 
-- 已纳管并推送：`kkunkunya/dc-psv-converter-sim`（private）。
-- 进展：提交已包含重建代码与证据更新。
-- 备注：私有仓库分支保护仍受账号策略限制（403）。
+- 脚本：`scripts/build_dc_psv_system.m`、`scripts/run_case_simulation.m`、`init_params.m`
+- 测试：`tests/test_acceptance_criteria.m`、`tests/test_model_structure.m`
+- 数据：`data/*.csv`、`data/*.png`、`data/summary_results.csv`
 
 ## 4) 下一步
 
-- 继续按 M3/M4 做高保真扩展（电机与控制环细化、参数辨识、2020b 兼容复验）。
+- 在不破坏当前门禁通过的前提下，继续推进 M3/M4 高保真物理细化与 2020b 兼容复验。

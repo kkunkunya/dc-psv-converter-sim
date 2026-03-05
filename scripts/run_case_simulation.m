@@ -2,10 +2,18 @@
 % Output: simulation result struct (t, Vdc, Idc, V_pos_gnd, V_neg_gnd)
 % Pos: scripts/run_case_simulation.m
 
-function out = run_case_simulation(mode_id, fault_id, stop_time)
+function out = run_case_simulation(mode_id, fault_id, stop_time, base_mode_id)
     if nargin < 3
         stop_time = 1.0;
     end
+    if nargin < 4
+        base_mode_id = 1;
+    end
+
+    validateattributes(mode_id, {'numeric'}, {'scalar', 'integer', '>=', 1, '<=', 4});
+    validateattributes(base_mode_id, {'numeric'}, {'scalar', 'integer', '>=', 1, '<=', 4});
+    validateattributes(fault_id, {'numeric'}, {'scalar', 'integer', '>=', 0, '<=', 3});
+    validateattributes(stop_time, {'numeric'}, {'scalar', 'positive'});
 
     root_dir = fileparts(fileparts(mfilename('fullpath')));
     addpath(root_dir);
@@ -17,6 +25,7 @@ function out = run_case_simulation(mode_id, fault_id, stop_time)
     fault_cfg = set_fault_mode(fault_id);
 
     assignin('base', 'mode_id_sim', mode_id);
+    assignin('base', 'mode_base_sim', base_mode_id);
     assignin('base', 'fault_id_sim', fault_id);
 
     model_path = fullfile(root_dir, 'models', 'dc_psv_system.slx');
@@ -45,6 +54,7 @@ function out = run_case_simulation(mode_id, fault_id, stop_time)
 
     out = struct();
     out.mode_id = mode_id;
+    out.base_mode_id = base_mode_id;
     out.fault_id = fault_id;
     out.refs = refs;
     out.fault_cfg = fault_cfg;

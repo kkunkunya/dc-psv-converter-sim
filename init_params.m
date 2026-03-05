@@ -28,6 +28,9 @@ function params = init_params()
     if evalin('base', 'exist(''mode_id_sim'', ''var'')') == 0
         assignin('base', 'mode_id_sim', 1);
     end
+    if evalin('base', 'exist(''mode_base_sim'', ''var'')') == 0
+        assignin('base', 'mode_base_sim', 1);
+    end
     if evalin('base', 'exist(''fault_id_sim'', ''var'')') == 0
         assignin('base', 'fault_id_sim', 0);
     end

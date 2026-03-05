@@ -28,8 +28,10 @@ function model_path = build_dc_psv_system()
         'Position', [40 60 70 90]);
     add_block('simulink/Sources/Constant', [model_name '/Mode_ID_Target'], ...
         'Value', 'mode_id_sim', 'Position', [40 130 130 160]);
+    add_block('simulink/Sources/Constant', [model_name '/Mode_ID_Base'], ...
+        'Value', 'mode_base_sim', 'Position', [40 165 130 195]);
     add_block('simulink/Sources/Constant', [model_name '/Fault_ID'], ...
-        'Value', 'fault_id_sim', 'Position', [40 200 130 230]);
+        'Value', 'fault_id_sim', 'Position', [40 235 130 265]);
 
     % Top-level functional subsystems
     add_block('simulink/Ports & Subsystems/Subsystem', [model_name '/Control_Subsystem'], ...
@@ -66,10 +68,11 @@ function model_path = build_dc_psv_system()
     add_to_workspace(model_name, 'I_fault_ToWorkspace', 'I_fault_total', [1360 320 1490 350]);
 
     % Top-level connections
-    add_line(model_name, 'Clock/1', 'Control_Subsystem/1', 'autorouting', 'smart');
-    add_line(model_name, 'Mode_ID_Target/1', 'Control_Subsystem/2', 'autorouting', 'smart');
+    add_line(model_name, 'Mode_ID_Target/1', 'Control_Subsystem/1', 'autorouting', 'smart');
+    add_line(model_name, 'Mode_ID_Base/1', 'Control_Subsystem/2', 'autorouting', 'smart');
 
     add_line(model_name, 'Control_Subsystem/1', 'Load_Subsystem/1', 'autorouting', 'smart');
+    add_line(model_name, 'Control_Subsystem/1', 'Generation_Subsystem/2', 'autorouting', 'smart');
 
     add_line(model_name, 'Clock/1', 'Fault_Subsystem/1', 'autorouting', 'smart');
     add_line(model_name, 'Fault_ID/1', 'Fault_Subsystem/2', 'autorouting', 'smart');
@@ -105,15 +108,13 @@ end
 function create_control_subsystem(path)
     clear_subsystem(path);
 
-    add_block('simulink/Sources/Constant', [path '/Base_Mode1'], ...
-        'Value', '1', 'Position', [40 95 90 120]);
     add_block('simulink/Sources/Step', [path '/Mode_Switch_Step'], ...
         'Time', '0.5', 'Before', '0', 'After', '1', 'Position', [40 45 90 75]);
 
-    add_block('simulink/Ports & Subsystems/In1', [path '/Clock_In'], ...
-        'Position', [20 35 40 55]);
     add_block('simulink/Ports & Subsystems/In1', [path '/Mode_Target_In'], ...
-        'Position', [20 155 40 175]);
+        'Position', [20 115 40 135]);
+    add_block('simulink/Ports & Subsystems/In1', [path '/Mode_Base_In'], ...
+        'Position', [20 165 40 185]);
     add_block('simulink/Signal Routing/Switch', [path '/Mode_Selector'], ...
         'Criteria', 'u2 >= Threshold', 'Threshold', '0.5', ...
         'Position', [160 85 220 145]);
@@ -122,7 +123,7 @@ function create_control_subsystem(path)
 
     add_line(path, 'Mode_Target_In/1', 'Mode_Selector/1', 'autorouting', 'smart');
     add_line(path, 'Mode_Switch_Step/1', 'Mode_Selector/2', 'autorouting', 'smart');
-    add_line(path, 'Base_Mode1/1', 'Mode_Selector/3', 'autorouting', 'smart');
+    add_line(path, 'Mode_Base_In/1', 'Mode_Selector/3', 'autorouting', 'smart');
     add_line(path, 'Mode_Selector/1', 'Mode_Active_Out/1', 'autorouting', 'smart');
 end
 
@@ -130,15 +131,18 @@ function create_generation_subsystem(path)
     clear_subsystem(path);
 
     add_block('simulink/Ports & Subsystems/In1', [path '/Vdc_Feedback_In'], ...
-        'Position', [20 120 40 140]);
+        'Position', [20 95 40 115]);
+    add_block('simulink/Ports & Subsystems/In1', [path '/Mode_Active_In'], ...
+        'Position', [20 155 40 175]);
 
     dg_names = {'DG1_Branch', 'DG2_Branch', 'DG3_Branch', 'DG4_Branch'};
     vref = [1500, 1498, 1502, 1501];
+    ibias_by_mode = [630, 1050, 365, 605];
     ypos = [20, 95, 170, 245];
     for i = 1:4
         add_block('simulink/Ports & Subsystems/Subsystem', [path '/' dg_names{i}], ...
             'Position', [120 ypos(i) 320 ypos(i)+60]);
-        create_dg_branch([path '/' dg_names{i}], vref(i));
+        create_dg_branch([path '/' dg_names{i}], vref(i), ibias_by_mode);
     end
 
     add_block('simulink/Math Operations/Sum', [path '/Igen_Sum'], ...
@@ -148,37 +152,53 @@ function create_generation_subsystem(path)
 
     for i = 1:4
         add_line(path, 'Vdc_Feedback_In/1', [dg_names{i} '/1'], 'autorouting', 'smart');
+        add_line(path, 'Mode_Active_In/1', [dg_names{i} '/2'], 'autorouting', 'smart');
         add_line(path, [dg_names{i} '/1'], ['Igen_Sum/' num2str(i)], 'autorouting', 'smart');
     end
     add_line(path, 'Igen_Sum/1', 'I_gen_total_Out/1', 'autorouting', 'smart');
 end
 
-function create_dg_branch(path, vref)
+function create_dg_branch(path, vref, ibias_by_mode)
     clear_subsystem(path);
 
     add_block('simulink/Ports & Subsystems/In1', [path '/Vdc_In'], ...
-        'Position', [20 55 40 75]);
+        'Position', [20 40 40 60]);
+    add_block('simulink/Ports & Subsystems/In1', [path '/Mode_In'], ...
+        'Position', [20 115 40 135]);
     add_block('simulink/Sources/Constant', [path '/Vref'], ...
-        'Value', num2str(vref), 'Position', [20 15 80 35]);
+        'Value', num2str(vref), 'Position', [20 5 80 25]);
 
     add_block('simulink/Math Operations/Sum', [path '/Verr'], ...
-        'Inputs', '+-', 'Position', [110 35 130 85]);
+        'Inputs', '+-', 'Position', [100 25 120 75]);
     add_block('simulink/Math Operations/Gain', [path '/Kp'], ...
-        'Gain', '0.6', 'Position', [160 25 210 55]);
+        'Gain', '0.7', 'Position', [150 20 210 50]);
     add_block('simulink/Math Operations/Gain', [path '/Ki'], ...
-        'Gain', '2', 'Position', [160 75 210 105]);
+        'Gain', '5', 'Position', [150 70 210 100]);
     add_block('simulink/Continuous/Integrator', [path '/Integrator'], ...
-        'InitialCondition', '0', 'Position', [245 75 275 105]);
-    add_block('simulink/Sources/Constant', [path '/Ibias'], ...
-        'Value', '730', 'Position', [235 15 285 35]);
+        'InitialCondition', '0', 'Position', [235 70 265 100]);
+    for m = 1:4
+        add_block('simulink/Logic and Bit Operations/Compare To Constant', ...
+            [path '/ModeEq' num2str(m)], ...
+            'const', num2str(m), 'relop', '==', ...
+            'Position', [70 115 + (m-1)*25 130 136 + (m-1)*25]);
+        add_block('simulink/Signal Attributes/Data Type Conversion', ...
+            [path '/ModeEq' num2str(m) '_ToDouble'], ...
+            'OutDataTypeStr', 'double', ...
+            'Position', [136 115 + (m-1)*25 155 136 + (m-1)*25]);
+        add_block('simulink/Math Operations/Gain', [path '/Ibias' num2str(m)], ...
+            'Gain', num2str(ibias_by_mode(m)), ...
+            'Position', [165 115 + (m-1)*25 235 136 + (m-1)*25]);
+    end
+    add_block('simulink/Math Operations/Sum', [path '/Ibias_Sum'], ...
+        'Inputs', '++++', 'Position', [265 140 285 220]);
     add_block('simulink/Math Operations/Sum', [path '/PI_plus_bias'], ...
-        'Inputs', '+++', 'Position', [315 35 335 95]);
+        'Inputs', '+++', 'Position', [315 45 335 105]);
     add_block('simulink/Discontinuities/Saturation', [path '/I_Sat'], ...
-        'UpperLimit', '2500', 'LowerLimit', '0', 'Position', [360 45 410 85]);
+        'UpperLimit', '2600', 'LowerLimit', '0', 'Position', [360 55 410 95]);
     add_block('simulink/Continuous/Transfer Fcn', [path '/Lrect_Dynamics'], ...
-        'Numerator', '[1]', 'Denominator', '[0.03 1]', 'Position', [440 45 520 85]);
+        'Numerator', '[1]', 'Denominator', '[0.02 1]', 'Position', [440 55 520 95]);
     add_block('simulink/Ports & Subsystems/Out1', [path '/Iout'], ...
-        'Position', [560 55 580 75]);
+        'Position', [560 65 580 85]);
 
     add_line(path, 'Vref/1', 'Verr/1', 'autorouting', 'smart');
     add_line(path, 'Vdc_In/1', 'Verr/2', 'autorouting', 'smart');
@@ -187,7 +207,15 @@ function create_dg_branch(path, vref)
     add_line(path, 'Ki/1', 'Integrator/1', 'autorouting', 'smart');
     add_line(path, 'Kp/1', 'PI_plus_bias/1', 'autorouting', 'smart');
     add_line(path, 'Integrator/1', 'PI_plus_bias/2', 'autorouting', 'smart');
-    add_line(path, 'Ibias/1', 'PI_plus_bias/3', 'autorouting', 'smart');
+    for m = 1:4
+        add_line(path, 'Mode_In/1', ['ModeEq' num2str(m) '/1'], 'autorouting', 'smart');
+        add_line(path, ['ModeEq' num2str(m) '/1'], ...
+            ['ModeEq' num2str(m) '_ToDouble/1'], 'autorouting', 'smart');
+        add_line(path, ['ModeEq' num2str(m) '_ToDouble/1'], ...
+            ['Ibias' num2str(m) '/1'], 'autorouting', 'smart');
+        add_line(path, ['Ibias' num2str(m) '/1'], ['Ibias_Sum/' num2str(m)], 'autorouting', 'smart');
+    end
+    add_line(path, 'Ibias_Sum/1', 'PI_plus_bias/3', 'autorouting', 'smart');
     add_line(path, 'PI_plus_bias/1', 'I_Sat/1', 'autorouting', 'smart');
     add_line(path, 'I_Sat/1', 'Lrect_Dynamics/1', 'autorouting', 'smart');
     add_line(path, 'Lrect_Dynamics/1', 'Iout/1', 'autorouting', 'smart');
@@ -309,7 +337,7 @@ function create_fault_subsystem(path)
         'Operator', 'AND', 'Position', [385 100 420 130]);
 
     add_block('simulink/Math Operations/Gain', [path '/Inv_Rfault'], ...
-        'Gain', '15', 'Position', [455 155 505 185]);
+        'Gain', '24', 'Position', [455 155 505 185]);
     add_block('simulink/Math Operations/Product', [path '/Fault_Current_Product'], ...
         'Position', [540 140 575 180]);
 
@@ -370,13 +398,13 @@ function create_bus_subsystem(path)
         'UpperLimit', '1550', 'LowerLimit', '200', 'Position', [430 95 500 125]);
 
     add_block('simulink/Math Operations/Gain', [path '/I_damping'], ...
-        'Gain', '0.01', 'Position', [430 145 500 175]);
+        'Gain', '0.015', 'Position', [430 145 500 175]);
     add_block('simulink/Sources/Constant', [path '/Vdc_Ref'], ...
-        'Value', '1478', 'Position', [250 150 300 170]);
+        'Value', '1500', 'Position', [250 150 300 170]);
     add_block('simulink/Math Operations/Sum', [path '/Vreg_Error'], ...
         'Inputs', '+-', 'Position', [330 145 350 175]);
     add_block('simulink/Math Operations/Gain', [path '/Kvreg'], ...
-        'Gain', '25', 'Position', [370 145 420 175]);
+        'Gain', '35', 'Position', [370 145 420 175]);
 
     add_block('simulink/Ports & Subsystems/Out1', [path '/Vdc_Out'], ...
         'Position', [550 100 570 120]);
@@ -466,6 +494,11 @@ function create_ground_monitor_subsystem(path)
 end
 
 function clear_subsystem(path)
+    existing_lines = find_system(path, 'FindAll', 'on', 'SearchDepth', 1, 'Type', 'line');
+    for i = 1:numel(existing_lines)
+        delete_line(existing_lines(i));
+    end
+
     existing = find_system(path, 'SearchDepth', 1, 'Type', 'Block');
     for i = 1:numel(existing)
         if strcmp(existing{i}, path)
