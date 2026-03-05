@@ -1,0 +1,21 @@
+# macOS
+.DS_Store
+
+# MATLAB generated
+*.asv
+*.autosave
+*.mexa64
+*.mexmaci64
+slprj/
+*.slxc
+
+# Logs / temp
+*.log
+temp/
+debug/
+
+# Python cache (if tools added later)
+__pycache__/
+
+# Local agent metadata
+.agents/
